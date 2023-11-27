@@ -157,11 +157,23 @@ $ sudo gcloud compute scp /etc/kubernetes/admin.conf node-2:/etc/kubernetes/admi
 $ sudo gcloud compute scp /etc/kubernetes/admin.conf node-3:/etc/kubernetes/admin.conf
 ```
 
+### Clean up the control plane
+```
+$ sudo systemctl stop kubelet
+$ sudo kubeadm reset -f --cri-socket unix:///run/cri-dockerd.sock
+
+$ sudo rm -rf ~/.kube
+$ sudo rm -rf /root/.kube
+$ sudo rm -rf /var/lib/etcd
+$ sudo rm -rf /etc/kubernetes
+```
+
 ### [Quickstart for Calico on K8s](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart)
 Install Calico:
 ```
-$ kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/tigera-operator.yaml
+$ curl https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/tigera-operator.yaml -O
 $ curl https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/custom-resources.yaml -O
+$ kubectl create -f tigera-operator.yaml
 $ kubectl create -f custom-resources.yaml
 $ watch kubectl get pods -n calico-system
 ```
@@ -179,6 +191,19 @@ $ sudo calicoctl node status
 
 # Node Endpoint Check
 $ calicoctl get workloadendpoint -A
+```
+
+Remove Calico:
+```
+$ kubectl delete -f custom-resources.yaml
+$ kubectl delete -f tigera-operator.yaml
+
+$ sudo rm -rf /var/run/calico/
+$ sudo rm -rf /var/lib/calico/
+$ sudo rm -rf /etc/cni/net.d/
+$ sudo rm -rf /var/lib/cni/
+$ sudo rm -rf /opt/cni
+$ sudo reboot
 ```
 
 
@@ -199,8 +224,6 @@ $ mkdir -p $HOME/.kube
 $ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 $ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
-
-
 
 
 
