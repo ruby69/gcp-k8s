@@ -107,29 +107,38 @@ $ kubectl version --client=true
 ## Initialize Master
 
 ### Create single control-plane cluster
+Initialize the cluster:
 ```
 $ sudo kubeadm config images pull --cri-socket unix:///run/cri-dockerd.sock
-$ sudo kubeadm init --ignore-preflight-errors=all --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=10.178.0.11 --cri-socket /var/run/cri-dockerd.sock
-  ->     kubeadm join 10.178.0.11:6443 --token <token_value> --discovery-token-ca-cert-hash <hash_value>
+$ sudo kubeadm init --ignore-preflight-errors=all --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=10.178.0.11 --cri-socket unix:///run/cri-dockerd.sock
+...
+To start using your cluster, you need to run the following as a regular user:
 
-# check the token
-$ kubeadm token create --print-join-command
-```
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+...
 
-```
-# configuration kubeadm
-$ mkdir -p $HOME/.kube
-$ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 10.178.0.11:6443 --token <token_value> --discovery-token-ca-cert-hash <hash_value>
 
 $ kubectl get nodes -o wide
 $ kubectl get pod -A
 ```
 
+If you lost the token:
 ```
-# copy admin.conf to other nodes.
-$ sudo scp /etc/kubernetes/admin.conf worker@node02:/home/worker/admin.conf
-$ sudo scp /etc/kubernetes/admin.conf worker@node03:/home/worker/admin.conf
+$ kubeadm token create --print-join-command
+kubeadm join 10.178.0.11:6443 --token <token_value> --discovery-token-ca-cert-hash <hash_value>
+```
+
+After login to gcloud, copy admin.conf file to other nodes:
+```
+$ sudo gcloud auth login
+$ sudo gcloud config list
+$ sudo gcloud compute scp /etc/kubernetes/admin.conf node-2:/etc/kubernetes/admin.conf
+$ sudo gcloud compute scp /etc/kubernetes/admin.conf node-3:/etc/kubernetes/admin.conf
 ```
 
 ### Initialize CNI(Calico)
@@ -146,19 +155,22 @@ $ sudo chmod +x /usr/local/bin/calicoctl
 
 
 ## Initialize Worker
+Join the cluster:
 ```
 $ sudo kubeadm config images pull --cri-socket unix:///run/cri-dockerd.sock
 $ sudo kubeadm join 10.178.0.11:6443 --token <token_value> --discovery-token-ca-cert-hash <hash_value>  --cri-socket unix:///run/cri-dockerd.sock
+...
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+
+$ kubectl get nodes -o wide
 ```
 
+To start using cluster as a regular user:
 ```
-# configuration kubeadm
 $ mkdir -p $HOME/.kube
 $ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 $ sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-$ kubectl get nodes -o wide
-$ kubectl get pod -A
 ```
 
 
