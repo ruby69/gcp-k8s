@@ -10,13 +10,13 @@ $ sudo apt-get update
 $ sudo apt-get install -y vim tzdata apt-transport-https ca-certificates curl gpg gnupg lsb-release
 ```
 
-### turn off swap
+### Turn off swap
 ```
 $ sudo swapoff -a
 $ sudo sed -i '/swap/s/^/#/' /etc/fstab
 ```
 
-### configure ip_forward
+### Configure ip_forward
 ```
 $ sudo vi /etc/sysctl.conf
 net.ipv4.ip_forward=1 # uncomment
@@ -27,21 +27,28 @@ $ sudo sysctl -p
 
 ## Install Docker
 
-### Docker
+### [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu)
+Add Docker's official GPG key:
 ```
-$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-$ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+$ sudo install -m 0755 -d /etc/apt/keyrings
+$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+$ sudo chmod a+r /etc/apt/keyrings/docker.gpg
+```
+
+Add the repository to Apt sources:
+```
+$ echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
 $ sudo apt-get update
-$ sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-
-# docker-compose
-$ sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-$ sudo chmod +x /usr/local/bin/docker-compose
-$ sudo groupadd docker
-$ sudo gpasswd -a ${USER} docker
+$ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
 ```
 
-### CRI-Docker
+
+### [Install cri-dockerd](https://github.com/Mirantis/cri-dockerd)
+The easiest way to install cri-dockerd is to use one of the pre-built binaries or packages from the [releases page](https://github.com/Mirantis/cri-dockerd/releases).
 ```
 $ VER=$(curl -s https://api.github.com/repos/Mirantis/cri-dockerd/releases/latest|grep tag_name | cut -d '"' -f 4|sed 's/v//g'); echo $VER
 $ wget https://github.com/Mirantis/cri-dockerd/releases/download/v${VER}/cri-dockerd-${VER}.amd64.tgz
@@ -90,7 +97,8 @@ $ sudo sysctl --system
 ```
 
 
-## Install kubeadm, kubectl and kubelet 
+## [Installing kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
+These instructions are for Kubernetes 1.28:
 ```
 $ sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 $ echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
@@ -104,13 +112,17 @@ $ kubectl version --client=true
 ```
 
 
-## Initialize Master
+## [Creating a cluster with kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
 
-### Create single control-plane cluster
-Initialize the cluster:
+### Initializing control-plane node
+To initialize the control-plane node run:
 ```
 $ sudo kubeadm config images pull --cri-socket unix:///run/cri-dockerd.sock
-$ sudo kubeadm init --ignore-preflight-errors=all --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=10.178.0.11 --cri-socket unix:///run/cri-dockerd.sock
+$ sudo kubeadm init \
+        --ignore-preflight-errors=all \
+	--pod-network-cidr=192.168.0.0/16 \
+	--apiserver-advertise-address=10.178.0.11 \
+	--cri-socket unix:///run/cri-dockerd.sock
 ...
 To start using your cluster, you need to run the following as a regular user:
 
@@ -122,6 +134,10 @@ To start using your cluster, you need to run the following as a regular user:
 Then you can join any number of worker nodes by running the following on each as root:
 
 kubeadm join 10.178.0.11:6443 --token <token_value> --discovery-token-ca-cert-hash <hash_value>
+
+$ mkdir -p $HOME/.kube
+$ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 $ kubectl get nodes -o wide
 $ kubectl get pod -A
@@ -141,21 +157,32 @@ $ sudo gcloud compute scp /etc/kubernetes/admin.conf node-2:/etc/kubernetes/admi
 $ sudo gcloud compute scp /etc/kubernetes/admin.conf node-3:/etc/kubernetes/admin.conf
 ```
 
-### Initialize CNI(Calico)
+### [Quickstart for Calico on K8s](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart)
+Install Calico:
 ```
 $ kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/tigera-operator.yaml
 $ curl https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/custom-resources.yaml -O
 $ kubectl create -f custom-resources.yaml
 $ watch kubectl get pods -n calico-system
+```
 
-# calicoctl
-$ sudo curl -L "https://github.com/projectcalico/calico/releases/download/v3.23.3/calicoctl-linux-amd64" -o /usr/local/bin/calicoctl
+Install calicoctl:
+```
+$ sudo curl -L "https://github.com/projectcalico/calico/releases/download/v3.26.4/calicoctl-linux-amd64" -o /usr/local/bin/calicoctl
 $ sudo chmod +x /usr/local/bin/calicoctl
+
+# CNI Type Check 
+$ calicoctl get ippool -o wide
+
+# BGP Protocol Check
+$ sudo calicoctl node status
+
+# Node Endpoint Check
+$ calicoctl get workloadendpoint -A
 ```
 
 
-## Initialize Worker
-Join the cluster:
+## Joining nodes
 ```
 $ sudo kubeadm config images pull --cri-socket unix:///run/cri-dockerd.sock
 $ sudo kubeadm join 10.178.0.11:6443 --token <token_value> --discovery-token-ca-cert-hash <hash_value>  --cri-socket unix:///run/cri-dockerd.sock
